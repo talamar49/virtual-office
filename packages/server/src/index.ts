@@ -1,92 +1,82 @@
+/**
+ * Virtual Office — Backend Server
+ * 
+ * Express + WebSocket server that proxies OpenClaw Gateway data
+ * to the frontend with adaptive polling and real-time updates.
+ */
+
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
-import { WebSocketServer, WebSocket } from 'ws';
-import { fetchAgentStatuses, AgentStatus } from './gateway.js';
+import { apiRouter } from './routes/api.js';
+import { initWebSocket, broadcast, closeAllConnections } from './ws/handler.js';
+import { startPoller, stopPoller } from './services/status-poller.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
 
+// --- Middleware ---
 app.use(cors());
 app.use(express.json());
 
-// HTTP server
+// --- Routes ---
+app.use('/api', apiRouter);
+
+// --- HTTP Server ---
 const server = createServer(app);
 
-// WebSocket server
-const wss = new WebSocketServer({ server, path: '/ws' });
+// --- WebSocket ---
+initWebSocket(server);
 
-// Connected clients
-const clients = new Set<WebSocket>();
+// --- Start Polling ---
+startPoller(broadcast);
 
-wss.on('connection', (ws) => {
-  clients.add(ws);
-  console.log(`[WS] Client connected (${clients.size} total)`);
-  
-  // Send current state immediately
-  sendCurrentState(ws);
-  
-  ws.on('close', () => {
-    clients.delete(ws);
-    console.log(`[WS] Client disconnected (${clients.size} total)`);
-  });
-});
-
-// Broadcast to all clients
-function broadcast(data: object) {
-  const message = JSON.stringify(data);
-  for (const client of clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
-    }
-  }
-}
-
-// Send current state to a single client
-async function sendCurrentState(ws: WebSocket) {
-  try {
-    const agents = await fetchAgentStatuses();
-    ws.send(JSON.stringify({ type: 'full-state', agents }));
-  } catch (err) {
-    console.error('[Gateway] Failed to fetch state:', err);
-  }
-}
-
-// Poll Gateway every 10 seconds and broadcast updates
-let lastState: AgentStatus[] = [];
-
-async function pollAndBroadcast() {
-  try {
-    const agents = await fetchAgentStatuses();
-    
-    // Simple diff: broadcast if anything changed
-    const stateJson = JSON.stringify(agents);
-    if (stateJson !== JSON.stringify(lastState)) {
-      lastState = agents;
-      broadcast({ type: 'full-state', agents });
-    }
-  } catch (err) {
-    console.error('[Gateway] Poll error:', err);
-  }
-}
-
-setInterval(pollAndBroadcast, 10_000);
-
-// REST endpoints
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', clients: clients.size });
-});
-
-app.get('/api/agents', async (_req, res) => {
-  try {
-    const agents = await fetchAgentStatuses();
-    res.json(agents);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch agent statuses' });
-  }
-});
-
+// --- Start Listening ---
 server.listen(PORT, () => {
   console.log(`🏢 Virtual Office server running on http://localhost:${PORT}`);
   console.log(`📡 WebSocket available at ws://localhost:${PORT}/ws`);
+  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`👥 Agents API: http://localhost:${PORT}/api/agents`);
+});
+
+// --- Graceful Shutdown ---
+
+let isShuttingDown = false;
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.log(`\n[Shutdown] Received ${signal}. Shutting down gracefully...`);
+
+  // 1. Stop accepting new connections
+  server.close(() => {
+    console.log('[Shutdown] HTTP server closed');
+  });
+
+  // 2. Stop the poller
+  stopPoller();
+
+  // 3. Close all WebSocket connections
+  closeAllConnections();
+
+  // 4. Give pending requests time to finish
+  await new Promise((resolve) => setTimeout(resolve, 2_000));
+
+  console.log('[Shutdown] Cleanup complete. Exiting.');
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught errors
+process.on('uncaughtException', (err) => {
+  console.error('[Fatal] Uncaught exception:', err);
+  gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Fatal] Unhandled rejection:', reason);
+  // Don't exit on unhandled rejections — log and continue
 });
