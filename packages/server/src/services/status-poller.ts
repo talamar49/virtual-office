@@ -189,8 +189,13 @@ async function pollCycle(): Promise<void> {
       const oldStatus = stateMap.get(agentId);
 
       if (!oldStatus) {
-        // First time seeing this agent
+        // First time seeing this agent — emit as initial state
         stateMap.set(agentId, newStatus);
+        updates.push({
+          agentId,
+          changes: newStatus,
+          previousState: undefined,
+        });
         continue;
       }
 

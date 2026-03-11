@@ -93,10 +93,17 @@ export const AGENT_DESKS: AgentDesk[] = [
   { id: 'michal', tileX: 10, tileY: 6, label: 'מיכל', emoji: '🔍' },
   { id: 'gil', tileX: 13, tileY: 6, label: 'גיל', emoji: '⚙️' },
 
+  // Dev row continued
+  { id: 'alon', tileX: 16, tileY: 6, label: 'אלון', emoji: '🧑‍💻' },
+
   // Bottom section
   { id: 'dana', tileX: 1, tileY: 10, label: 'דנה', emoji: '💜' },
   { id: 'lior', tileX: 4, tileY: 10, label: 'ליאור', emoji: '📈' },
   { id: 'tomer', tileX: 1, tileY: 12, label: 'תומר', emoji: '💼' },
+
+  // Meeting room area
+  { id: 'ido', tileX: 13, tileY: 11, label: 'עידו', emoji: '🦞' },
+  { id: 'shahar', tileX: 16, tileY: 11, label: 'שחר', emoji: '🛡️' },
 ];
 
 /**

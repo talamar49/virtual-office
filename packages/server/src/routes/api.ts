@@ -74,8 +74,8 @@ apiRouter.get('/agents/:id', (req, res) => {
   const activity = getAgentActivity(id, 20);
 
   res.json({
-    ...meta,
-    status: status ?? {
+    agent: meta,
+    currentStatus: status ?? {
       state: 'offline',
       lastActivity: null,
       lastMessage: null,

@@ -59,7 +59,8 @@ function handleClientMessage(ws: WebSocket, msg: any): void {
       sendToClient(ws, { type: 'pong', timestamp: Date.now() });
       break;
     case 'subscribe':
-      // Future: filter updates by agent IDs
+      // TODO: Implement agent filtering — client sends { type: 'subscribe', agents: ['itai', 'noa'] }
+      // to receive updates only for specific agents. Useful for individual agent detail views.
       break;
     default:
       break;
