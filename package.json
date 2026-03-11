@@ -1,0 +1,13 @@
+{
+  "name": "virtual-office",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "dev:client": "pnpm --filter client dev",
+    "dev:server": "pnpm --filter server dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
